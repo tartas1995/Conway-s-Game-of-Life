@@ -14,6 +14,7 @@ class Game {
         this.render = this.render.bind(this);
         this.resize = this.resize.bind(this);
         this.zoom = this.zoom.bind(this);
+        this.randomCells = this.randomCells.bind(this);
         this.animate = this.animate.bind(this);
         this.addEventListeners = this.addEventListeners.bind(this);
         this.canvas = canvas;
@@ -33,8 +34,9 @@ class Game {
         };
         // cache to store game related data
         this.state = {
-            cells:[{x:1,y:1}]
+            cells:[{x:1,y:1},{x:0,y:0}]
         };
+        this.randomCells();
         this.resize();
         // init Event listeners
         this.addEventListeners();
@@ -53,6 +55,15 @@ class Game {
         this.canvas.width = rect.width;
         this.screen.height = this.canvas.clientHeight;
         this.screen.width = this.canvas.clientWidth;
+    }
+
+    randomCells() {
+        this.state.cells = [];
+        for (let i = 0; i < 5; i++) {
+            const x = Math.floor(Math.random() * 5);
+            const y = Math.floor(Math.random() * 5);
+            this.state.cells.push({x,y})
+        }
     }
 
     zoom(e) {
@@ -85,7 +96,6 @@ class Game {
         this.ctx.fillStyle = COLOR_BLACK;
         this.ctx.fillRect(0, 0, this.screen.width, this.screen.height);
         // draw borders
-        //TODO: disable border when zoom too small
         this.ctx.strokeStyle = COLOR_WHITE;
         this.ctx.lineWidth = 1;
         this.ctx.lineCap = "round";
@@ -107,7 +117,15 @@ class Game {
             this.ctx.stroke();
         }
         // draw cells
-
+        this.ctx.fillStyle = COLOR_WHITE;
+        for (const cell of this.state.cells) {
+            this.ctx.fillRect(
+                (cell.x + 1) * (this.screen.zoom + 1),
+                (cell.y + 1) * (this.screen.zoom + 1), 
+                this.screen.zoom, 
+                this.screen.zoom
+            );
+        }
     }
 }
 

@@ -15,6 +15,7 @@ class Game {
         this.resize = this.resize.bind(this);
         this.zoom = this.zoom.bind(this);
         this.randomCells = this.randomCells.bind(this);
+        this.pause = this.pause.bind(this);
         this.animate = this.animate.bind(this);
         this.addEventListeners = this.addEventListeners.bind(this);
         this.canvas = canvas;
@@ -34,7 +35,8 @@ class Game {
         };
         // cache to store game related data
         this.state = {
-            cells:[{x:1,y:1},{x:0,y:0}]
+            cells:[{x:1,y:1},{x:0,y:0}],
+            pause: false,
         };
         this.randomCells();
         this.resize();
@@ -42,6 +44,10 @@ class Game {
         this.addEventListeners();
         // start the animation motor
         window.requestAnimationFrame(this.animate);
+    }
+
+    pause() {
+        this.state.pause = !this.state.pause;
     }
 
     addEventListeners() {
@@ -71,15 +77,15 @@ class Game {
         // scroll direction 
         // deltaY+ = down
         if (e.deltaY > 0) {
-            this.screen.zoom += this.screen.zoom * 10 / 100;
-        } else { // deltaY- = up
             this.screen.zoom -= this.screen.zoom * 10 / 100;
+        } else { // deltaY- = up
+            this.screen.zoom += this.screen.zoom * 10 / 100;
         }
     }
 
     animate() {
         // request new frame as soon as possible
-        window.requestAnimationFrame(this.animate);
+        if (!this.state.pause) window.requestAnimationFrame(this.animate);
         // get now and calculate the time that has passed
         const now = Date.now();
         const elapsed = now - this.frameCache.timeOfLastFrame;

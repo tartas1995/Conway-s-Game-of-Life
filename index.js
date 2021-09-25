@@ -46,15 +46,25 @@ class Game {
         window.requestAnimationFrame(this.animate);
     }
 
+    /**
+     * toggles the pause status of the game
+     */
     pause() {
         this.state.pause = !this.state.pause;
+        if (!this.state.pause) window.requestAnimationFrame(this.animate());
     }
 
+    /**
+     * add Event Listeners 
+     */
     addEventListeners() {
         window.addEventListener('resize', this.resize);
         document.addEventListener('wheel', this.zoom);
     }
 
+    /**
+     * handles resize 
+     */
     resize() {
         const rect = this.canvas.getBoundingClientRect();
         this.canvas.height = rect.height;
@@ -63,6 +73,10 @@ class Game {
         this.screen.width = this.canvas.clientWidth;
     }
 
+    /**
+     * clear cells
+     * generate random Cells 
+     */
     randomCells() {
         this.state.cells = [];
         for (let i = 0; i < 5; i++) {
@@ -72,17 +86,23 @@ class Game {
         }
     }
 
+    /**
+     * handles Wheel Events
+     * @param {WheelEvent} e 
+     */
     zoom(e) {
         e.preventDefault();
         // scroll direction 
-        // deltaY+ = down
-        if (e.deltaY > 0) {
+        if (e.deltaY > 0) { // deltaY+ = down
             this.screen.zoom -= this.screen.zoom * 10 / 100;
         } else { // deltaY- = up
             this.screen.zoom += this.screen.zoom * 10 / 100;
         }
     }
 
+    /**
+     * animation frame request that throttles to the fpsInterval in the frame cache
+     */
     animate() {
         // request new frame as soon as possible
         if (!this.state.pause) window.requestAnimationFrame(this.animate);
@@ -97,29 +117,33 @@ class Game {
         }
     }
 
+    /**
+     * renders a frame
+     */
     render() {
         // draw background
         this.ctx.fillStyle = COLOR_BLACK;
         this.ctx.fillRect(0, 0, this.screen.width, this.screen.height);
         // draw borders
-        this.ctx.strokeStyle = COLOR_WHITE;
-        this.ctx.lineWidth = 1;
-        this.ctx.lineCap = "round";
-        let cursor = -1 * Math.abs(this.screen.x % (this.screen.zoom + 1));
-        this.ctx.beginPath();
-        while (cursor + (this.screen.zoom + 1) < this.screen.width) {
-            cursor = cursor + (this.screen.zoom + 1);
+        if (this.screen.zoom > 8) {
+            this.ctx.strokeStyle = COLOR_WHITE;
+            this.ctx.lineWidth = 1;
+            this.ctx.lineCap = "round";
             this.ctx.beginPath();
-            this.ctx.moveTo(cursor, 0);
-            this.ctx.lineTo(cursor, this.screen.height);
-            this.ctx.stroke();
-        }
-        cursor = -1 * Math.abs(this.screen.y % (this.screen.zoom + 1));
-        while (cursor + (this.screen.zoom + 1) < this.screen.height) {
-            cursor = cursor + (this.screen.zoom + 1);
-            this.ctx.beginPath();
-            this.ctx.moveTo(0, cursor);
-            this.ctx.lineTo(this.screen.width, cursor);
+            // draw vertical lines
+            let cursor = -1 * Math.abs(this.screen.x % (this.screen.zoom + 1));
+            while (cursor + (this.screen.zoom + 1) < this.screen.width) {
+                cursor = cursor + (this.screen.zoom + 1);
+                this.ctx.moveTo(cursor, 0);
+                this.ctx.lineTo(cursor, this.screen.height);
+            }
+            // draw horizontal lines
+            cursor = -1 * Math.abs(this.screen.y % (this.screen.zoom + 1));
+            while (cursor + (this.screen.zoom + 1) < this.screen.height) {
+                cursor = cursor + (this.screen.zoom + 1);
+                this.ctx.moveTo(0, cursor);
+                this.ctx.lineTo(this.screen.width, cursor);
+            }
             this.ctx.stroke();
         }
         // draw cells

@@ -51,7 +51,7 @@ class Game {
      */
     pause() {
         this.state.pause = !this.state.pause;
-        if (!this.state.pause) window.requestAnimationFrame(this.animate());
+        if (!this.state.pause) window.requestAnimationFrame(this.animate);
     }
 
     /**
@@ -92,6 +92,8 @@ class Game {
      */
     zoom(e) {
         e.preventDefault();
+        // disable zoom when paused
+        if (this.state.pause) return false;
         // scroll direction 
         if (e.deltaY > 0) { // deltaY+ = down
             this.screen.zoom -= this.screen.zoom * 10 / 100;
@@ -105,7 +107,9 @@ class Game {
      */
     animate() {
         // request new frame as soon as possible
-        if (!this.state.pause) window.requestAnimationFrame(this.animate);
+        if (!this.state.pause) {
+            window.requestAnimationFrame(this.animate);
+        }
         // get now and calculate the time that has passed
         const now = Date.now();
         const elapsed = now - this.frameCache.timeOfLastFrame;
@@ -126,7 +130,7 @@ class Game {
         this.ctx.fillRect(0, 0, this.screen.width, this.screen.height);
         // draw borders
         if (this.screen.zoom > 8) {
-            this.ctx.strokeStyle = COLOR_WHITE;
+            this.ctx.strokeStyle = COLOR_GRAY;
             this.ctx.lineWidth = 1;
             this.ctx.lineCap = "round";
             this.ctx.beginPath();
@@ -154,6 +158,25 @@ class Game {
                 (cell.y + 1) * (this.screen.zoom + 1), 
                 this.screen.zoom, 
                 this.screen.zoom
+            );
+        }
+        // draw pause text
+        if (this.state.pause) {
+            const text = 'Paused!';
+            const textPixelSize = 30;
+            this.ctx.font = `bold ${textPixelSize}px Arial`;
+            this.ctx.fillStyle = COLOR_WHITE;
+            this.ctx.strokeStyle = COLOR_BLACK;
+            const textMetrix = this.ctx.measureText(text);
+            this.ctx.fillText(
+                text, 
+                this.screen.width / 2 - textMetrix.width / 2, 
+                this.screen.height / 2 - textPixelSize / 2
+            ); 
+            this.ctx.strokeText(
+                text, 
+                this.screen.width / 2 - textMetrix.width / 2, 
+                this.screen.height / 2 - textPixelSize / 2
             );
         }
     }

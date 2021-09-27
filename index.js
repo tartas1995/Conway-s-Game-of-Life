@@ -14,6 +14,9 @@ class Game {
         this.render = this.render.bind(this);
         this.resize = this.resize.bind(this);
         this.zoom = this.zoom.bind(this);
+        this.cameraOn = this.cameraOn.bind(this);
+        this.cameraOff = this.cameraOff.bind(this);
+        this.cameraMove = this.cameraMove.bind(this);
         this.randomCells = this.randomCells.bind(this);
         this.pause = this.pause.bind(this);
         this.animate = this.animate.bind(this);
@@ -32,6 +35,7 @@ class Game {
             x: 0,
             y: 0,
             zoom: 100,
+            pastPosition: {x:null, y:null},
         };
         // cache to store game related data
         this.state = {
@@ -60,6 +64,9 @@ class Game {
     addEventListeners() {
         window.addEventListener('resize', this.resize);
         document.addEventListener('wheel', this.zoom);
+        this.canvas.addEventListener('mousedown', this.cameraOn);
+        this.canvas.addEventListener('mouseup', this.cameraOff);
+        this.canvas.addEventListener('mousemove', this.cameraMove);
     }
 
     /**
@@ -99,6 +106,31 @@ class Game {
             this.screen.zoom -= this.screen.zoom * 10 / 100;
         } else { // deltaY- = up
             this.screen.zoom += this.screen.zoom * 10 / 100;
+        }
+    }
+
+    cameraOn(e) {
+        e.preventDefault();
+        this.canvas.style.cursor = 'grab';
+        this.screen.pastPosition.x = e.offsetX;
+        this.screen.pastPosition.y = e.offsetY;
+    }
+
+    cameraOff(e) {
+        e.preventDefault();
+        this.canvas.style.cursor = 'auto';
+        this.screen.pastPosition.x = null;
+        this.screen.pastPosition.y = null;
+    }
+
+    cameraMove(e) {
+        e.preventDefault();
+        if (this.screen.pastPosition.x !== null && this.screen.pastPosition.y !== null) {
+            const distanceX = this.screen.pastPosition.x - e.offsetX;
+            const distanceY = this.screen.pastPosition.y - e.offsetY;
+            const speed = 0.2;
+            this.screen.x += distanceX * speed;
+            this.screen.y += distanceY * speed;
         }
     }
 
@@ -159,6 +191,13 @@ class Game {
                 this.screen.zoom, 
                 this.screen.zoom
             );
+        }
+        if (this.screen.pastPosition.x !== null) {
+            const radius = 10;
+            this.ctx.beginPath();
+            this.ctx.arc(this.screen.pastPosition.x, this.screen.pastPosition.y, radius, 0, 2 * Math.PI, false);
+            this.ctx.fillStyle = 'green';
+            this.ctx.fill();
         }
         // draw pause text
         if (this.state.pause) {

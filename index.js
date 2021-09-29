@@ -2,6 +2,8 @@ const COLOR_BLACK = '#000000';
 const COLOR_WHITE = '#FFFFFF';
 const COLOR_GRAY = '#808080';
 
+const BORDER_WIDTH = 1;
+
 /**
  * TODO: center focus point(zoom into center)
  * TODO: disable border when zoom too small
@@ -17,10 +19,16 @@ class Game {
         this.cameraOn = this.cameraOn.bind(this);
         this.cameraOff = this.cameraOff.bind(this);
         this.cameraMove = this.cameraMove.bind(this);
+        this.cameraMoveKeyboard = this.cameraMoveKeyboard.bind(this);
+        this.keydown = this.keydown.bind(this);
+        this.keyup = this.keyup.bind(this);
+        this.keypress = this.keypress.bind(this);
         this.randomCells = this.randomCells.bind(this);
         this.pause = this.pause.bind(this);
         this.animate = this.animate.bind(this);
         this.addEventListeners = this.addEventListeners.bind(this);
+        this.convertBetweenGameCordAndGS = this.convertBetweenGameCordAndGS.bind(this);
+        this.convertBetweenGSAndScreen = this.convertBetweenGSAndScreen.bind(this);
         this.canvas = canvas;
         this.ctx = this.canvas.getContext("2d");
         // cache to store framerate related data
@@ -35,19 +43,20 @@ class Game {
             x: 0,
             y: 0,
             zoom: 100,
-            pastPosition: {x:null, y:null},
+            grabPosition: {x:null, y:null},
         };
         // cache to store game related data
         this.state = {
             cells:[{x:1,y:1},{x:0,y:0}],
             pause: false,
         };
-        this.randomCells();
+        //this.randomCells();
         this.resize();
         // init Event listeners
         this.addEventListeners();
         // start the animation motor
         window.requestAnimationFrame(this.animate);
+        //this.pause();
     }
 
     /**
@@ -64,6 +73,9 @@ class Game {
     addEventListeners() {
         window.addEventListener('resize', this.resize);
         document.addEventListener('wheel', this.zoom);
+        document.addEventListener('keydown', this.keydown);
+        document.addEventListener('keyup', this.keyup);
+        document.addEventListener('keypress', this.keypress);
         this.canvas.addEventListener('mousedown', this.cameraOn);
         this.canvas.addEventListener('mouseup', this.cameraOff);
         this.canvas.addEventListener('mousemove', this.cameraMove);
@@ -111,27 +123,73 @@ class Game {
 
     cameraOn(e) {
         e.preventDefault();
+        if (this.state.pause) return;
         this.canvas.style.cursor = 'grab';
-        this.screen.pastPosition.x = e.offsetX;
-        this.screen.pastPosition.y = e.offsetY;
+        this.screen.grabPosition.x = e.offsetX;
+        this.screen.grabPosition.y = e.offsetY;
     }
 
     cameraOff(e) {
         e.preventDefault();
+        if (this.state.pause) return;
         this.canvas.style.cursor = 'auto';
-        this.screen.pastPosition.x = null;
-        this.screen.pastPosition.y = null;
+        this.screen.grabPosition.x = null;
+        this.screen.grabPosition.y = null;
     }
 
     cameraMove(e) {
         e.preventDefault();
-        if (this.screen.pastPosition.x !== null && this.screen.pastPosition.y !== null) {
-            const distanceX = this.screen.pastPosition.x - e.offsetX;
-            const distanceY = this.screen.pastPosition.y - e.offsetY;
-            const speed = 0.2;
-            this.screen.x += distanceX * speed;
-            this.screen.y += distanceY * speed;
+        if (this.state.pause) return;
+        if (this.screen.grabPosition.x !== null && this.screen.grabPosition.y !== null) {
+            const distanceX = this.screen.grabPosition.x - e.offsetX;
+            const distanceY = this.screen.grabPosition.y - e.offsetY;
+            this.screen.x += distanceX;
+            this.screen.y += distanceY;
+            this.screen.grabPosition.x = e.offsetX;
+            this.screen.grabPosition.y = e.offsetY;
         }
+    }
+
+    cameraMoveKeyboard(key, type) {
+        if (!this.state.pause && type === 'down') {
+            switch (key) {
+                case 'w':
+                case 'ArrowUp':
+                    this.screen.y += -10
+                    break;
+                case 'd':
+                case 'ArrowRight':
+                    this.screen.x += 10
+                    break;
+                case 'a':
+                case 'ArrowLeft':
+                    this.screen.x += -10
+                    break;
+                case 's':
+                case 'ArrowDown':
+                    this.screen.y += 10
+                    break;
+            }
+        }
+    }
+
+    keydown(e) {
+        if ((e.key === 'r' || e.key === 'F5') && e.ctrlKey) return;
+        e.preventDefault();
+        this.cameraMoveKeyboard(e.key,'down');
+        if (e.key === "p") {
+            this.pause();
+        }
+    }
+
+    keyup(e) {
+        e.preventDefault();
+        this.cameraMoveKeyboard(e.key,'up');
+    }
+
+    keypress(e) {
+        e.preventDefault();
+        this.cameraMoveKeyboard(e.key,'press');
     }
 
     /**
@@ -153,6 +211,22 @@ class Game {
         }
     }
 
+    convertBetweenGameCordAndGS(cord, to) {
+        if (to == 'GS') {
+            return { x: cord.x * (this.screen.zoom+BORDER_WIDTH), y: cord.y * (this.screen.zoom+BORDER_WIDTH) }
+        } else {
+            return { x: cord.x / (this.screen.zoom+BORDER_WIDTH), y: cord.y / (this.screen.zoom+BORDER_WIDTH) }
+        }
+    }
+
+    convertBetweenGSAndScreen(cord, to) {
+        if (to == 'GS') {
+            return { x: cord.x - this.screen.x, y: cord.y - this.screen.y }
+        } else {
+            return { x: cord.x + this.screen.x, y: cord.y + this.screen.y }
+        }
+    }
+
     /**
      * renders a frame
      */
@@ -163,20 +237,21 @@ class Game {
         // draw borders
         if (this.screen.zoom > 8) {
             this.ctx.strokeStyle = COLOR_GRAY;
-            this.ctx.lineWidth = 1;
+            this.ctx.lineWidth = BORDER_WIDTH;
             this.ctx.lineCap = "round";
             this.ctx.beginPath();
             // draw vertical lines
-            let cursor = -1 * Math.abs(this.screen.x % (this.screen.zoom + 1));
-            while (cursor + (this.screen.zoom + 1) < this.screen.width) {
-                cursor = cursor + (this.screen.zoom + 1);
+            const screenStartInGS = this.convertBetweenGSAndScreen({x:0,y:0}, 'GS');
+            let cursor = (screenStartInGS.x % (this.screen.zoom + BORDER_WIDTH)) - (this.screen.zoom + BORDER_WIDTH);
+            while (cursor + (this.screen.zoom + BORDER_WIDTH) < this.screen.width) {
+                cursor = cursor + (this.screen.zoom + BORDER_WIDTH);
                 this.ctx.moveTo(cursor, 0);
                 this.ctx.lineTo(cursor, this.screen.height);
             }
             // draw horizontal lines
-            cursor = -1 * Math.abs(this.screen.y % (this.screen.zoom + 1));
-            while (cursor + (this.screen.zoom + 1) < this.screen.height) {
-                cursor = cursor + (this.screen.zoom + 1);
+            cursor = (screenStartInGS.y % (this.screen.zoom + BORDER_WIDTH)) - (this.screen.zoom + BORDER_WIDTH);
+            while (cursor + (this.screen.zoom + BORDER_WIDTH) < this.screen.height) {
+                cursor = cursor + (this.screen.zoom + BORDER_WIDTH);
                 this.ctx.moveTo(0, cursor);
                 this.ctx.lineTo(this.screen.width, cursor);
             }
@@ -184,18 +259,26 @@ class Game {
         }
         // draw cells
         this.ctx.fillStyle = COLOR_WHITE;
+        const renderBorderThreshold = (-1 * (this.screen.zoom + BORDER_WIDTH));
         for (const cell of this.state.cells) {
+            const gscord = this.convertBetweenGameCordAndGS(cell, 'GS');
+            const cord = this.convertBetweenGSAndScreen(gscord,'screen');
+            //console.log(cell, gscord, cord)
+            if (cord.x < renderBorderThreshold) continue;
+            if (cord.y < renderBorderThreshold) continue;
+            if (cord.x > this.screen.width) continue;
+            if (cord.y > this.screen.height) continue;
             this.ctx.fillRect(
-                (cell.x + 1) * (this.screen.zoom + 1),
-                (cell.y + 1) * (this.screen.zoom + 1), 
+                cord.x,
+                cord.x, 
                 this.screen.zoom, 
                 this.screen.zoom
             );
         }
-        if (this.screen.pastPosition.x !== null) {
+        if (this.screen.grabPosition.x !== null) {
             const radius = 10;
             this.ctx.beginPath();
-            this.ctx.arc(this.screen.pastPosition.x, this.screen.pastPosition.y, radius, 0, 2 * Math.PI, false);
+            this.ctx.arc(this.screen.grabPosition.x, this.screen.grabPosition.y, radius, 0, 2 * Math.PI, false);
             this.ctx.fillStyle = 'green';
             this.ctx.fill();
         }

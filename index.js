@@ -29,6 +29,8 @@ class Game {
         this.addEventListeners = this.addEventListeners.bind(this);
         this.convertBetweenGameCordAndGS = this.convertBetweenGameCordAndGS.bind(this);
         this.convertBetweenGSAndScreen = this.convertBetweenGSAndScreen.bind(this);
+        this.printDebug = this.printDebug.bind(this);
+        this.keyRegisterAction = this.keyRegisterAction.bind(this);
         this.canvas = canvas;
         this.ctx = this.canvas.getContext("2d");
         // cache to store framerate related data
@@ -49,6 +51,7 @@ class Game {
         this.state = {
             cells:[{x:1,y:1},{x:0,y:0}],
             pause: false,
+            keyPressed: {},
         };
         //this.randomCells();
         this.resize();
@@ -150,47 +153,49 @@ class Game {
         }
     }
 
-    cameraMoveKeyboard(key, type) {
-        if (!this.state.pause && type === 'down') {
-            switch (key) {
-                case 'w':
-                case 'ArrowUp':
-                    this.screen.y += -10
-                    break;
-                case 'd':
-                case 'ArrowRight':
-                    this.screen.x += 10
-                    break;
-                case 'a':
-                case 'ArrowLeft':
-                    this.screen.x += -10
-                    break;
-                case 's':
-                case 'ArrowDown':
-                    this.screen.y += 10
-                    break;
+    cameraMoveKeyboard() {
+        if (!this.state.pause) {
+            if (this.state.keyPressed['w'] || this.state.keyPressed['ArrowUp']){
+                this.screen.y += -10;
+            }
+            if (this.state.keyPressed['d'] || this.state.keyPressed['ArrowRight']){
+                this.screen.x += 10
+            }
+            if (this.state.keyPressed['a'] || this.state.keyPressed['ArrowLeft']){
+                this.screen.x += -10
+            }
+            if (this.state.keyPressed['s'] || this.state.keyPressed['ArrowDown']){
+                this.screen.y += 10
             }
         }
+    }
+
+    keyRegisterAction() {
+        this.cameraMoveKeyboard();
     }
 
     keydown(e) {
         if ((e.key === 'r' || e.key === 'F5') && e.ctrlKey) return;
         e.preventDefault();
-        this.cameraMoveKeyboard(e.key,'down');
-        if (e.key === "p") {
-            this.pause();
+        switch (e.key) {
+            case 'p':
+                this.pause();
+                break;
         }
+        this.state.keyPressed[e.key] = true;
+        this.keyRegisterAction();
     }
 
     keyup(e) {
         e.preventDefault();
-        this.cameraMoveKeyboard(e.key,'up');
+        this.state.keyPressed[e.key] = false;
     }
 
     keypress(e) {
         e.preventDefault();
-        this.cameraMoveKeyboard(e.key,'press');
     }
+
+
 
     /**
      * animation frame request that throttles to the fpsInterval in the frame cache
@@ -221,10 +226,18 @@ class Game {
 
     convertBetweenGSAndScreen(cord, to) {
         if (to == 'GS') {
-            return { x: cord.x - this.screen.x, y: cord.y - this.screen.y }
-        } else {
             return { x: cord.x + this.screen.x, y: cord.y + this.screen.y }
+        } else {
+            return { x: cord.x - this.screen.x, y: cord.y - this.screen.y }
         }
+    }
+
+    printDebug() {
+        const screenStartInGS = this.convertBetweenGSAndScreen({x:0,y:0}, 'GS');
+        console.log(screenStartInGS)
+        console.log((screenStartInGS.x % (this.screen.zoom + BORDER_WIDTH)))
+        let cursor = (screenStartInGS.x % (this.screen.zoom + BORDER_WIDTH)) + (this.screen.zoom + BORDER_WIDTH);
+        console.log(cursor)
     }
 
     /**
@@ -242,18 +255,18 @@ class Game {
             this.ctx.beginPath();
             // draw vertical lines
             const screenStartInGS = this.convertBetweenGSAndScreen({x:0,y:0}, 'GS');
-            let cursor = (screenStartInGS.x % (this.screen.zoom + BORDER_WIDTH)) - (this.screen.zoom + BORDER_WIDTH);
-            while (cursor + (this.screen.zoom + BORDER_WIDTH) < this.screen.width) {
-                cursor = cursor + (this.screen.zoom + BORDER_WIDTH);
+            let cursor = ((screenStartInGS.x % (this.screen.zoom + BORDER_WIDTH)) * -1);
+            while (cursor < this.screen.width) {
                 this.ctx.moveTo(cursor, 0);
                 this.ctx.lineTo(cursor, this.screen.height);
+                cursor = cursor + (this.screen.zoom + BORDER_WIDTH);
             }
             // draw horizontal lines
-            cursor = (screenStartInGS.y % (this.screen.zoom + BORDER_WIDTH)) - (this.screen.zoom + BORDER_WIDTH);
-            while (cursor + (this.screen.zoom + BORDER_WIDTH) < this.screen.height) {
-                cursor = cursor + (this.screen.zoom + BORDER_WIDTH);
+            cursor = ((screenStartInGS.y % (this.screen.zoom + BORDER_WIDTH)) * -1);
+            while (cursor < this.screen.height) {
                 this.ctx.moveTo(0, cursor);
                 this.ctx.lineTo(this.screen.width, cursor);
+                cursor = cursor + (this.screen.zoom + BORDER_WIDTH);
             }
             this.ctx.stroke();
         }
@@ -263,14 +276,13 @@ class Game {
         for (const cell of this.state.cells) {
             const gscord = this.convertBetweenGameCordAndGS(cell, 'GS');
             const cord = this.convertBetweenGSAndScreen(gscord,'screen');
-            //console.log(cell, gscord, cord)
             if (cord.x < renderBorderThreshold) continue;
             if (cord.y < renderBorderThreshold) continue;
             if (cord.x > this.screen.width) continue;
             if (cord.y > this.screen.height) continue;
             this.ctx.fillRect(
                 cord.x,
-                cord.x, 
+                cord.y, 
                 this.screen.zoom, 
                 this.screen.zoom
             );

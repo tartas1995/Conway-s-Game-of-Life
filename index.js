@@ -13,24 +13,39 @@ const BORDER_WIDTH = 1;
 
 class Game {
     constructor(canvas) {
+        // screen
         this.render = this.render.bind(this);
         this.resize = this.resize.bind(this);
         this.zoom = this.zoom.bind(this);
+        // camera
         this.cameraOn = this.cameraOn.bind(this);
         this.cameraOff = this.cameraOff.bind(this);
         this.cameraMove = this.cameraMove.bind(this);
         this.cameraMoveKeyboard = this.cameraMoveKeyboard.bind(this);
+        // cells
+        this.randomCells = this.randomCells.bind(this);
+        this.selectCell = this.selectCell.bind(this);
+        this.releaseCell = this.releaseCell.bind(this);
+        this.toggleCell = this.toggleCell.bind(this);
+        // event
         this.keydown = this.keydown.bind(this);
         this.keyup = this.keyup.bind(this);
         this.keypress = this.keypress.bind(this);
-        this.randomCells = this.randomCells.bind(this);
+        this.mousedown = this.mousedown.bind(this);
+        this.mouseup = this.mouseup.bind(this);
+        this.mousemove = this.mousemove.bind(this);
+        this.addEventListeners = this.addEventListeners.bind(this);
+        this.keyRegisterAction = this.keyRegisterAction.bind(this);
+        // general
+        this.startGameClock = this.startGameClock.bind(this);
+        this.stopGameClock = this.stopGameClock.bind(this);
+        this.gameClock = this.gameClock.bind(this);
         this.pause = this.pause.bind(this);
         this.animate = this.animate.bind(this);
-        this.addEventListeners = this.addEventListeners.bind(this);
         this.convertBetweenGameCordAndGS = this.convertBetweenGameCordAndGS.bind(this);
         this.convertBetweenGSAndScreen = this.convertBetweenGSAndScreen.bind(this);
         this.printDebug = this.printDebug.bind(this);
-        this.keyRegisterAction = this.keyRegisterAction.bind(this);
+        // assignment
         this.canvas = canvas;
         this.ctx = this.canvas.getContext("2d");
         // cache to store framerate related data
@@ -50,6 +65,9 @@ class Game {
         // cache to store game related data
         this.state = {
             cells:[{x:1,y:1},{x:0,y:0}],
+            selectedCell: null,
+            ms: 1000,
+            gameInterval: null,
             pause: false,
             keyPressed: {},
         };
@@ -59,7 +77,6 @@ class Game {
         this.addEventListeners();
         // start the animation motor
         window.requestAnimationFrame(this.animate);
-        //this.pause();
     }
 
     /**
@@ -67,7 +84,12 @@ class Game {
      */
     pause() {
         this.state.pause = !this.state.pause;
-        if (!this.state.pause) window.requestAnimationFrame(this.animate);
+        if (!this.state.pause) {
+            window.requestAnimationFrame(this.animate);
+            this.startGameClock();
+        } else {
+            this.stopGameClock();
+        }
     }
 
     /**
@@ -79,9 +101,9 @@ class Game {
         document.addEventListener('keydown', this.keydown);
         document.addEventListener('keyup', this.keyup);
         document.addEventListener('keypress', this.keypress);
-        this.canvas.addEventListener('mousedown', this.cameraOn);
-        this.canvas.addEventListener('mouseup', this.cameraOff);
-        this.canvas.addEventListener('mousemove', this.cameraMove);
+        this.canvas.addEventListener('mousedown', this.mousedown);
+        this.canvas.addEventListener('mouseup', this.mouseup);
+        this.canvas.addEventListener('mousemove', this.mousemove);
     }
 
     /**
@@ -181,6 +203,9 @@ class Game {
             case 'p':
                 this.pause();
                 break;
+            case ' ': //space
+                this.startGameClock();
+                break;
         }
         this.state.keyPressed[e.key] = true;
         this.keyRegisterAction();
@@ -195,7 +220,53 @@ class Game {
         e.preventDefault();
     }
 
+    mousedown(e) {
+        if (!this.state.pause) {
+            this.cameraOn(e);
+            this.selectCell(e);
+        }
+    }
 
+    mouseup(e) {
+        if (!this.state.pause) {
+            this.cameraOff(e);
+            this.releaseCell(e);
+        }
+    }
+
+    mousemove(e) {
+        this.cameraMove(e);
+    }
+
+    selectCell(e) {
+        const gscord = this.convertBetweenGSAndScreen({ x:e.offsetX, y:e.offsetY }, 'GS');
+        const gamecord = this.convertBetweenGameCordAndGS(gscord, 'game');
+        this.state.selectedCell = gamecord;
+        setTimeout(() => {
+            this.state.selectedCell = null;
+        }, 200);
+    }
+
+    releaseCell(e) {
+        if (this.state.selectedCell !== null) {
+            const gscord = this.convertBetweenGSAndScreen({ x:e.offsetX, y:e.offsetY }, 'GS');
+            const gamecord = this.convertBetweenGameCordAndGS(gscord, 'game');
+            if (gamecord.x === this.state.selectedCell.x && gamecord.y === this.state.selectedCell.y) {
+                this.toggleCell(gamecord);
+            }
+        }
+    }
+
+    toggleCell(cord) {
+        let index = this.state.cells.findIndex(function(cell) {
+            return cell.x == this.x && cell.y == this.y;
+        }, cord);
+        if (index === -1) {
+            this.state.cells.push(cord);
+        } else {
+            this.state.cells.splice(index, 1);
+        }
+    }
 
     /**
      * animation frame request that throttles to the fpsInterval in the frame cache
@@ -216,11 +287,98 @@ class Game {
         }
     }
 
+    startGameClock() {
+        // this.state.gameInterval = setInterval(this.gameClock, this.state.ms)
+    }
+
+    stopGameClock() {
+        clearInterval(this.state.gameInterval);
+        this.state.gameInterval = null;
+    }
+
+    gameClock() {
+        /**
+         * if cell has 3 living neighbor, it will be born
+         * if cell has less than 2 neighbor, it will die
+         * if cell has 2 or 3 living neighbor, it will contuine to live
+         * if cell has more than 3 living neighbor, it will be die
+         */
+        // get neighbors and cells
+        const board = {};
+        for (let cell of this.state.cells) {
+            if (!!board[cell.y]) board[cell.y] = {};
+            // top row
+            if (!board[cell.y - 1]) board[cell.y - 1] = {};
+            if (!board[cell.y - 1][cell.x - 1]) board[cell.y - 1][cell.x - 1] = false;
+            if (!board[cell.y - 1][cell.x]) board[cell.y - 1][cell.x] = false;
+            if (!board[cell.y - 1][cell.x + 1]) board[cell.y - 1][cell.x + 1] = false;
+            // middle row
+            if (!board[cell.y]) board[cell.y] = {};
+            if (!board[cell.y][cell.x - 1]) board[cell.y][cell.x - 1] = false;
+            board[cell.y][cell.x] = true;
+            if (!board[cell.y][cell.x + 1]) board[cell.y][cell.x + 1] = false;
+            // bottom row
+            if (!board[cell.y + 1]) board[cell.y + 1] = {};
+            if (!board[cell.y + 1][cell.x - 1]) board[cell.y + 1][cell.x - 1] = false;
+            if (!board[cell.y + 1][cell.x]) board[cell.y + 1][cell.x] = false;
+            if (!board[cell.y + 1][cell.x + 1]) board[cell.y + 1][cell.x + 1] = false;
+        }
+        console.log(board)
+        const cells = [];
+        // check living condition of "cells"
+        for (let i in board) {
+            const row = board[i];
+            for (let j in row) {
+                const cell = row[j];
+                if (cell) { //if a living
+                    let numberOfNeighbor = 0;
+                    // top row
+                    if (!!board[i - 1]) {
+                        if (board[i - 1][j - 1]) numberOfNeighbor++;
+                        if (board[i - 1][j]) numberOfNeighbor++;
+                        if (board[i - 1][j + 1]) numberOfNeighbor++;
+                    }
+                    // middle row
+                    if (board[i][j - 1]) numberOfNeighbor++;
+                    if (board[i][j + 1]) numberOfNeighbor++;
+                    // bottom row
+                    if (!!board[i + 1]) {
+                        if (board[i + 1][j - 1]) numberOfNeighbor++;
+                        if (board[i + 1][j]) numberOfNeighbor++;
+                        if (board[i + 1][j + 1]) numberOfNeighbor++;
+                    }
+                    console.log(i, j, numberOfNeighbor , 'l', numberOfNeighbor > 1 && numberOfNeighbor < 4);
+                    if (numberOfNeighbor > 1 && numberOfNeighbor < 4) cells.push({x: j, y: i});
+                } else {
+                    let numberOfNeighbor = 0;
+                    // top row
+                    if (!!board[i - 1]) {
+                        if (board[i - 1][j - 1]) numberOfNeighbor++;
+                        if (board[i - 1][j]) numberOfNeighbor++;
+                        if (board[i - 1][j + 1]) numberOfNeighbor++;
+                    }
+                    // middle row
+                    if (board[i][j - 1]) numberOfNeighbor++;
+                    if (board[i][j + 1]) numberOfNeighbor++;
+                    // bottom row
+                    if (!!board[i + 1]) {
+                        if (board[i + 1][j - 1]) numberOfNeighbor++;
+                        if (board[i + 1][j]) numberOfNeighbor++;
+                        if (board[i + 1][j + 1]) numberOfNeighbor++;
+                    }
+                    console.log(i, j, numberOfNeighbor , 'd', numberOfNeighbor === 3);
+                    if (numberOfNeighbor === 3) cells.push({x: j, y: i});
+                }
+            }
+        }
+        this.state.cells = cells;
+    }
+
     convertBetweenGameCordAndGS(cord, to) {
         if (to == 'GS') {
             return { x: cord.x * (this.screen.zoom+BORDER_WIDTH), y: cord.y * (this.screen.zoom+BORDER_WIDTH) }
         } else {
-            return { x: cord.x / (this.screen.zoom+BORDER_WIDTH), y: cord.y / (this.screen.zoom+BORDER_WIDTH) }
+            return { x: Math.floor(cord.x / (this.screen.zoom+BORDER_WIDTH)), y: Math.floor(cord.y / (this.screen.zoom+BORDER_WIDTH)) }
         }
     }
 

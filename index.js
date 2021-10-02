@@ -64,9 +64,16 @@ class Game {
         };
         // cache to store game related data
         this.state = {
-            cells:[{x:1,y:1},{x:0,y:0}],
+            cells:[
+                {x:0,y:0},{x:1,y:0},{x:2,y:0},
+                {x:0,y:1},{x:2,y:1},
+                {x:0,y:2},{x:2,y:2},
+                {x:0,y:4},{x:2,y:4},
+                {x:0,y:5},{x:2,y:5},
+                {x:0,y:6},{x:1,y:6},{x:2,y:6},
+            ],
             selectedCell: null,
-            ms: 1000,
+            ms: 500,
             gameInterval: null,
             pause: false,
             keyPressed: {},
@@ -288,7 +295,7 @@ class Game {
     }
 
     startGameClock() {
-        // this.state.gameInterval = setInterval(this.gameClock, this.state.ms)
+        this.state.gameInterval = setInterval(this.gameClock, this.state.ms)
     }
 
     stopGameClock() {
@@ -306,7 +313,6 @@ class Game {
         // get neighbors and cells
         const board = {};
         for (let cell of this.state.cells) {
-            if (!!board[cell.y]) board[cell.y] = {};
             // top row
             if (!board[cell.y - 1]) board[cell.y - 1] = {};
             if (!board[cell.y - 1][cell.x - 1]) board[cell.y - 1][cell.x - 1] = false;
@@ -323,51 +329,51 @@ class Game {
             if (!board[cell.y + 1][cell.x]) board[cell.y + 1][cell.x] = false;
             if (!board[cell.y + 1][cell.x + 1]) board[cell.y + 1][cell.x + 1] = false;
         }
-        console.log(board)
         const cells = [];
         // check living condition of "cells"
         for (let i in board) {
             const row = board[i];
+            let ii = parseInt(i);
             for (let j in row) {
                 const cell = row[j];
+                let jj = parseInt(j);
                 if (cell) { //if a living
                     let numberOfNeighbor = 0;
                     // top row
-                    if (!!board[i - 1]) {
-                        if (board[i - 1][j - 1]) numberOfNeighbor++;
-                        if (board[i - 1][j]) numberOfNeighbor++;
-                        if (board[i - 1][j + 1]) numberOfNeighbor++;
+                    if (!!board[ii - 1]) {
+                        if (!!board[ii - 1][jj - 1]) numberOfNeighbor++;
+                        if (!!board[ii - 1][jj]) numberOfNeighbor++;
+                        if (!!board[ii - 1][jj + 1]) numberOfNeighbor++;
                     }
                     // middle row
-                    if (board[i][j - 1]) numberOfNeighbor++;
-                    if (board[i][j + 1]) numberOfNeighbor++;
+                    if (board[ii][jj - 1]) numberOfNeighbor++;
+                    if (board[ii][jj + 1]) numberOfNeighbor++;
                     // bottom row
-                    if (!!board[i + 1]) {
-                        if (board[i + 1][j - 1]) numberOfNeighbor++;
-                        if (board[i + 1][j]) numberOfNeighbor++;
-                        if (board[i + 1][j + 1]) numberOfNeighbor++;
+                    if (!!board[ii + 1]) {
+                        if (board[ii + 1][jj - 1]) numberOfNeighbor++;
+                        if (board[ii + 1][jj]) numberOfNeighbor++;
+                        if (board[ii + 1][jj + 1]) numberOfNeighbor++;
                     }
-                    console.log(i, j, numberOfNeighbor , 'l', numberOfNeighbor > 1 && numberOfNeighbor < 4);
-                    if (numberOfNeighbor > 1 && numberOfNeighbor < 4) cells.push({x: j, y: i});
+                    if (numberOfNeighbor > 1 && numberOfNeighbor < 4) cells.push({x: jj, y: ii});
                 } else {
                     let numberOfNeighbor = 0;
                     // top row
-                    if (!!board[i - 1]) {
-                        if (board[i - 1][j - 1]) numberOfNeighbor++;
-                        if (board[i - 1][j]) numberOfNeighbor++;
-                        if (board[i - 1][j + 1]) numberOfNeighbor++;
+                    if (!!board[ii - 1]) {
+                        if (board[ii - 1][jj - 1]) numberOfNeighbor++;
+                        if (board[ii - 1][jj]) numberOfNeighbor++;
+                        if (board[ii - 1][jj + 1]) numberOfNeighbor++;
                     }
                     // middle row
-                    if (board[i][j - 1]) numberOfNeighbor++;
-                    if (board[i][j + 1]) numberOfNeighbor++;
+                    if (board[ii][jj - 1]) numberOfNeighbor++;
+                    if (board[ii][jj + 1]) numberOfNeighbor++;
                     // bottom row
-                    if (!!board[i + 1]) {
-                        if (board[i + 1][j - 1]) numberOfNeighbor++;
-                        if (board[i + 1][j]) numberOfNeighbor++;
-                        if (board[i + 1][j + 1]) numberOfNeighbor++;
+                    if (!!board[ii + 1]) {
+                        if (board[ii + 1][jj - 1]) numberOfNeighbor++;
+                        if (board[ii + 1][jj]) numberOfNeighbor++;
+                        if (board[ii + 1][jj + 1]) numberOfNeighbor++;
                     }
-                    console.log(i, j, numberOfNeighbor , 'd', numberOfNeighbor === 3);
-                    if (numberOfNeighbor === 3) cells.push({x: j, y: i});
+                    //console.log(i, j, numberOfNeighbor , 'd', numberOfNeighbor === 3);
+                    if (numberOfNeighbor === 3) cells.push({x: jj, y: ii});
                 }
             }
         }

@@ -111,6 +111,10 @@ class Game {
         this.canvas.addEventListener('mousedown', this.mousedown);
         this.canvas.addEventListener('mouseup', this.mouseup);
         this.canvas.addEventListener('mousemove', this.mousemove);
+        this.canvas.addEventListener('touchstart', this.mousedown);
+        this.canvas.addEventListener('touchend', this.mouseup);
+        this.canvas.addEventListener('touchcancel', this.mouseup);
+        this.canvas.addEventListener('touchmove', this.mousemove);
     }
 
     /**
@@ -156,6 +160,7 @@ class Game {
     cameraOn(e) {
         e.preventDefault();
         if (this.state.pause) return;
+        if (e.button !== 0) return; // only when main button pressed
         this.canvas.style.cursor = 'grab';
         this.screen.grabPosition.x = e.offsetX;
         this.screen.grabPosition.y = e.offsetY;
@@ -164,6 +169,7 @@ class Game {
     cameraOff(e) {
         e.preventDefault();
         if (this.state.pause) return;
+        if (e.button !== 0) return; // only when main button pressed
         this.canvas.style.cursor = 'auto';
         this.screen.grabPosition.x = null;
         this.screen.grabPosition.y = null;
@@ -204,7 +210,12 @@ class Game {
     }
 
     keydown(e) {
-        if ((e.key === 'r' || e.key === 'F5') && e.ctrlKey) return;
+        // windows
+        if (e.key === 'F5') return;
+        // linux
+        if (e.key === 'r' && e.ctrlKey) return;
+        // macos
+        if (e.key === 'r' && e.metaKey) return;
         e.preventDefault();
         switch (e.key) {
             case 'p':
@@ -246,6 +257,7 @@ class Game {
     }
 
     selectCell(e) {
+        if (e.button !== 0) return; // only when main button pressed
         const gscord = this.convertBetweenGSAndScreen({ x:e.offsetX, y:e.offsetY }, 'GS');
         const gamecord = this.convertBetweenGameCordAndGS(gscord, 'game');
         this.state.selectedCell = gamecord;
@@ -255,6 +267,7 @@ class Game {
     }
 
     releaseCell(e) {
+        if (e.button !== 0) return; // only when main button pressed
         if (this.state.selectedCell !== null) {
             const gscord = this.convertBetweenGSAndScreen({ x:e.offsetX, y:e.offsetY }, 'GS');
             const gamecord = this.convertBetweenGameCordAndGS(gscord, 'game');

@@ -1,6 +1,7 @@
 const COLOR_BLACK = '#000000';
 const COLOR_WHITE = '#FFFFFF';
 const COLOR_GRAY = '#808080';
+const COLOR_BLUE = '#009DFF';
 
 const BORDER_WIDTH = 1;
 
@@ -23,6 +24,7 @@ class Game {
         // screen
         this.render = this.render.bind(this);
         this.resize = this.resize.bind(this);
+        this.calculateIconRegister = this.calculateIconRegister.bind(this);
         this.zoom = this.zoom.bind(this);
         // camera
         this.cameraOn = this.cameraOn.bind(this);
@@ -43,6 +45,7 @@ class Game {
         this.addEventListeners = this.addEventListeners.bind(this);
         this.keyRegisterAction = this.keyRegisterAction.bind(this);
         this.workerListener = this.workerListener.bind(this);
+        this.checkIconRegisterForEvents = this.checkIconRegisterForEvents.bind(this);
         // general
         this.startGameClock = this.startGameClock.bind(this);
         this.stopGameClock = this.stopGameClock.bind(this);
@@ -59,6 +62,14 @@ class Game {
             fpsInterval: 1000 / 60, // fps / 1 second
             timeOfLastFrame: 0,
         };
+        this.iconRegister = {
+            playButton: {
+                x: 0,
+                y: 0,
+                size: 0,
+                action: this.startGameClock,
+            }
+        }
         // cache to store screen related data
         this.screen = {
             height: this.canvas.clientHeight,
@@ -73,6 +84,7 @@ class Game {
             cells: null,
             selectedCell: null,
             pause: false,
+            started: false,
             keyPressed: {},
         };
         this.resize();
@@ -103,6 +115,24 @@ class Game {
             name: MS_CHANGED,
             ms: ms,
         })
+    }
+
+    calculateIconRegister() {
+        this.iconRegister.playButton.size = this.screen.width / 20;
+        this.iconRegister.playButton.x = this.screen.width / 100;
+        this.iconRegister.playButton.y = this.screen.height - (this.screen.width / 100) - (this.screen.width / 20);
+    }
+
+    checkIconRegisterForEvents(mouseX, mouseY) {
+        for (let key in this.iconRegister) {
+            const icon = this.iconRegister[key];
+            if (icon.x < mouseX && (icon.x + icon.size) > mouseX
+            &&  icon.y < mouseY && (icon.y + icon.size) > mouseY) {
+                icon.action();
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -145,6 +175,7 @@ class Game {
         this.canvas.width = rect.width;
         this.screen.height = this.canvas.clientHeight;
         this.screen.width = this.canvas.clientWidth;
+        this.calculateIconRegister();
     }
 
     /**
@@ -246,6 +277,9 @@ class Game {
 
     mousedown(e) {
         if (!this.state.pause) {
+            if (this.checkIconRegisterForEvents(e.offsetX, e.offsetY)) {
+                return;
+            }
             this.cameraOn(e);
             this.selectCell(e);
         }
@@ -310,6 +344,7 @@ class Game {
     }
 
     startGameClock() {
+        this.state.started = true;
         this.worker.postMessage({ name: GAME_START });
     }
 
@@ -409,6 +444,44 @@ class Game {
                 this.screen.width / 2 - textMetrix.width / 2, 
                 this.screen.height / 2 - textPixelSize / 2
             );
+        }
+        if (!this.state.started) {
+            const x = this.iconRegister.playButton.x;
+            const y = this.iconRegister.playButton.y;
+            const size = this.iconRegister.playButton.size;
+            this.ctx.fillStyle = COLOR_WHITE;
+            this.ctx.strokeStyle = COLOR_BLUE;
+            this.ctx.lineWidth = size / 20;
+            this.ctx.beginPath();
+            this.ctx.moveTo(x, y);
+            this.ctx.lineTo(x, y + size);
+            this.ctx.lineTo(x + size, y + (size / 2));
+            this.ctx.lineTo(x, y);
+            this.ctx.fill();
+            this.ctx.stroke();
+        } else {
+            const x = this.iconRegister.playButton.x;
+            const y = this.iconRegister.playButton.y;
+            const size = this.iconRegister.playButton.size;
+            const width = size / 3;
+            this.ctx.fillStyle = COLOR_WHITE;
+            this.ctx.strokeStyle = COLOR_BLUE;
+            this.ctx.lineWidth = size / 20;
+            this.ctx.beginPath();
+            // first element
+            this.ctx.moveTo(x, y);
+            this.ctx.lineTo(x, y + size);
+            this.ctx.lineTo(x + width, y + size);
+            this.ctx.lineTo(x + width, y);
+            this.ctx.lineTo(x, y);
+            // second element
+            this.ctx.moveTo(x + (width * 2), y);
+            this.ctx.lineTo(x + (width * 2), y + size);
+            this.ctx.lineTo(x + (width * 3), y + size);
+            this.ctx.lineTo(x + (width * 3), y);
+            this.ctx.lineTo(x + (width * 2), y);
+            this.ctx.fill();
+            this.ctx.stroke();
         }
     }
 }

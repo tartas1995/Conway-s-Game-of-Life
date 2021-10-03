@@ -36,12 +36,17 @@ class Game {
         this.releaseCell = this.releaseCell.bind(this);
         this.toggleCell = this.toggleCell.bind(this);
         // event
+        // keyboad event
         this.keydown = this.keydown.bind(this);
         this.keyup = this.keyup.bind(this);
         this.keypress = this.keypress.bind(this);
+        // mouse event
         this.mousedown = this.mousedown.bind(this);
         this.mouseup = this.mouseup.bind(this);
         this.mousemove = this.mousemove.bind(this);
+        // touch event
+        this.touchstart = this.touchstart.bind(this);
+        // general event
         this.addEventListeners = this.addEventListeners.bind(this);
         this.keyRegisterAction = this.keyRegisterAction.bind(this);
         this.workerListener = this.workerListener.bind(this);
@@ -50,6 +55,7 @@ class Game {
         this.startGameClock = this.startGameClock.bind(this);
         this.stopGameClock = this.stopGameClock.bind(this);
         this.pause = this.pause.bind(this);
+        this.freeze = this.freeze.bind(this);
         this.animate = this.animate.bind(this);
         this.convertBetweenGameCordAndGS = this.convertBetweenGameCordAndGS.bind(this);
         this.convertBetweenGSAndScreen = this.convertBetweenGSAndScreen.bind(this);
@@ -67,13 +73,8 @@ class Game {
                 x: 0,
                 y: 0,
                 size: 0,
-                action: () => {
-                    if (this.state.started) {
-                        this.stopGameClock();
-                    } else {
-                        this.startGameClock();
-                    }
-                },
+                hoverText: "Play/Pause (SPACE)",
+                action: this.pause,
             }
         }
         // cache to store screen related data
@@ -84,13 +85,18 @@ class Game {
             y: 0,
             zoom: 100,
             grabPosition: {x:null, y:null},
+            hover: {
+                text: null,
+                x: null,
+                y: null,
+            }
         };
         // cache to store game related data
         this.state = {
             cells: null,
             selectedCell: null,
-            pause: false,
-            started: false,
+            pause: true,
+            freezed: false,
             keyPressed: {},
         };
         this.resize();
@@ -141,13 +147,39 @@ class Game {
         return false;
     }
 
+    checkIconRegisterForHover(mouseX, mouseY) {
+        for (let key in this.iconRegister) {
+            const icon = this.iconRegister[key];
+            if (icon.x < mouseX && (icon.x + icon.size) > mouseX
+            &&  icon.y < mouseY && (icon.y + icon.size) > mouseY) {
+                this.screen.hover.text = icon.hoverText;
+                this.screen.hover.x = mouseX;
+                this.screen.hover.y = mouseY;
+                return;
+            }
+        }
+        this.screen.hover.text = null;
+        this.screen.hover.x = null;
+        this.screen.hover.y = null;
+        return false;
+    }
+
+    freeze() {
+        this.state.freezed = !this.state.freezed;
+        if (this.state.freezed) {
+            this.state.pause = true;
+            this.stopGameClock();
+        } else {
+            window.requestAnimationFrame(this.animate);
+        }
+    }
+
     /**
      * toggles the pause status of the game
      */
     pause() {
         this.state.pause = !this.state.pause;
         if (!this.state.pause) {
-            window.requestAnimationFrame(this.animate);
             this.startGameClock();
         } else {
             this.stopGameClock();
@@ -166,8 +198,8 @@ class Game {
         this.canvas.addEventListener('mousedown', this.mousedown);
         this.canvas.addEventListener('mouseup', this.mouseup);
         this.canvas.addEventListener('mousemove', this.mousemove);
-        /*this.canvas.addEventListener('touchstart', this.mousedown);
-        this.canvas.addEventListener('touchend', this.mouseup);
+        //this.canvas.addEventListener('touchstart', this.touchstart);
+        /*this.canvas.addEventListener('touchend', this.mouseup);
         this.canvas.addEventListener('touchcancel', this.mouseup);
         this.canvas.addEventListener('touchmove', this.mousemove);*/
     }
@@ -191,7 +223,7 @@ class Game {
     zoom(e) {
         e.preventDefault();
         // disable zoom when paused
-        if (this.state.pause) return false;
+        if (this.state.freezed) return false;
         // scroll direction 
         if (e.deltaY > 0) { // deltaY+ = down
             this.screen.zoom -= this.screen.zoom * 10 / 100;
@@ -202,7 +234,7 @@ class Game {
 
     cameraOn(e) {
         e.preventDefault();
-        if (this.state.pause) return;
+        if (this.state.freezed) return;
         if (e.button !== 0) return; // only when main button pressed
         this.canvas.style.cursor = 'grab';
         this.screen.grabPosition.x = e.offsetX;
@@ -211,7 +243,7 @@ class Game {
 
     cameraOff(e) {
         e.preventDefault();
-        if (this.state.pause) return;
+        if (this.state.freezed) return;
         if (e.button !== 0) return; // only when main button pressed
         this.canvas.style.cursor = 'auto';
         this.screen.grabPosition.x = null;
@@ -220,7 +252,7 @@ class Game {
 
     cameraMove(e) {
         e.preventDefault();
-        if (this.state.pause) return;
+        if (this.state.freezed) return;
         if (this.screen.grabPosition.x !== null && this.screen.grabPosition.y !== null) {
             const distanceX = this.screen.grabPosition.x - e.offsetX;
             const distanceY = this.screen.grabPosition.y - e.offsetY;
@@ -232,7 +264,7 @@ class Game {
     }
 
     cameraMoveKeyboard() {
-        if (!this.state.pause) {
+        if (!this.state.freezed) {
             if (this.state.keyPressed['w'] || this.state.keyPressed['ArrowUp']){
                 this.screen.y += -10;
             }
@@ -261,11 +293,12 @@ class Game {
         if (e.key === 'r' && e.metaKey) return;
         e.preventDefault();
         switch (e.key) {
-            case 'p':
-                this.pause();
+            case 'f':
+                this.freeze();
                 break;
+            case 'p':
             case ' ': //space
-                this.startGameClock();
+                this.pause();
                 break;
         }
         this.state.keyPressed[e.key] = true;
@@ -282,7 +315,7 @@ class Game {
     }
 
     mousedown(e) {
-        if (!this.state.pause) {
+        if (!this.state.freezed) {
             if (this.checkIconRegisterForEvents(e.offsetX, e.offsetY)) {
                 return;
             }
@@ -292,7 +325,7 @@ class Game {
     }
 
     mouseup(e) {
-        if (!this.state.pause) {
+        if (!this.state.freezed) {
             this.cameraOff(e);
             this.releaseCell(e);
         }
@@ -300,6 +333,11 @@ class Game {
 
     mousemove(e) {
         this.cameraMove(e);
+        this.checkIconRegisterForHover(e.offsetX, e.offsetY);
+    }
+
+    touchstart(e) {
+        console.log(e);
     }
 
     selectCell(e) {
@@ -335,7 +373,7 @@ class Game {
      */
     animate() {
         // request new frame as soon as possible
-        if (!this.state.pause) {
+        if (!this.state.freezed) {
             window.requestAnimationFrame(this.animate);
         }
         // get now and calculate the time that has passed
@@ -350,12 +388,10 @@ class Game {
     }
 
     startGameClock() {
-        this.state.started = true;
         this.worker.postMessage({ name: GAME_START });
     }
 
     stopGameClock() {
-        this.state.started = false;
         this.worker.postMessage({ name: GAME_END });
     }
 
@@ -433,11 +469,12 @@ class Game {
             this.ctx.fillStyle = 'green';
             this.ctx.fill();
         }
-        // draw pause text
-        if (this.state.pause) {
-            const text = 'Paused!';
+        // draw freezed text
+        if (this.state.freezed) {
+            const text = 'freezed!';
             const textPixelSize = 30;
             this.ctx.font = `bold ${textPixelSize}px Arial`;
+            this.ctx.lineWidth = BORDER_WIDTH;
             this.ctx.fillStyle = COLOR_WHITE;
             this.ctx.strokeStyle = COLOR_BLACK;
             const textMetrix = this.ctx.measureText(text);
@@ -452,7 +489,8 @@ class Game {
                 this.screen.height / 2 - textPixelSize / 2
             );
         }
-        if (!this.state.started) {
+        // playButton
+        if (this.state.pause) {
             const x = this.iconRegister.playButton.x;
             const y = this.iconRegister.playButton.y;
             const size = this.iconRegister.playButton.size;
@@ -489,6 +527,24 @@ class Game {
             this.ctx.lineTo(x + (width * 2), y);
             this.ctx.fill();
             this.ctx.stroke();
+        }
+        // hover text for icon
+        if (this.screen.hover.x !== null) {
+            const textPixelSize = 20;
+            this.ctx.font = `bold ${textPixelSize}px Arial`;
+            this.ctx.lineWidth = BORDER_WIDTH;
+            this.ctx.fillStyle = COLOR_WHITE;
+            this.ctx.strokeStyle = COLOR_BLACK;
+            this.ctx.fillText(
+                this.screen.hover.text, 
+                this.screen.hover.x, 
+                this.screen.hover.y
+            ); 
+            this.ctx.strokeText(
+                this.screen.hover.text, 
+                this.screen.hover.x, 
+                this.screen.hover.y
+            );
         }
     }
 }

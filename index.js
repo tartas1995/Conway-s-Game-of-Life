@@ -67,7 +67,13 @@ class Game {
                 x: 0,
                 y: 0,
                 size: 0,
-                action: this.startGameClock,
+                action: () => {
+                    if (this.state.started) {
+                        this.stopGameClock();
+                    } else {
+                        this.startGameClock();
+                    }
+                },
             }
         }
         // cache to store screen related data
@@ -349,6 +355,7 @@ class Game {
     }
 
     stopGameClock() {
+        this.state.started = false;
         this.worker.postMessage({ name: GAME_END });
     }
 

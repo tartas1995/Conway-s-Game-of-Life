@@ -4,6 +4,13 @@ const COLOR_GRAY = '#808080';
 
 const BORDER_WIDTH = 1;
 
+const WORKER_READY = 'worker ready';
+const CELL_UPDATE = 'cell update';
+const CELLS_UPDATED = 'cells updated';
+const GAME_START = 'game start';
+const GAME_END = 'game end';
+const MS_CHANGED = 'ms changed';
+
 /**
  * TODO: center focus point(zoom into center)
  * TODO: disable border when zoom too small
@@ -23,7 +30,6 @@ class Game {
         this.cameraMove = this.cameraMove.bind(this);
         this.cameraMoveKeyboard = this.cameraMoveKeyboard.bind(this);
         // cells
-        this.randomCells = this.randomCells.bind(this);
         this.selectCell = this.selectCell.bind(this);
         this.releaseCell = this.releaseCell.bind(this);
         this.toggleCell = this.toggleCell.bind(this);
@@ -36,10 +42,10 @@ class Game {
         this.mousemove = this.mousemove.bind(this);
         this.addEventListeners = this.addEventListeners.bind(this);
         this.keyRegisterAction = this.keyRegisterAction.bind(this);
+        this.workerListener = this.workerListener.bind(this);
         // general
         this.startGameClock = this.startGameClock.bind(this);
         this.stopGameClock = this.stopGameClock.bind(this);
-        this.gameClock = this.gameClock.bind(this);
         this.pause = this.pause.bind(this);
         this.animate = this.animate.bind(this);
         this.convertBetweenGameCordAndGS = this.convertBetweenGameCordAndGS.bind(this);
@@ -64,26 +70,39 @@ class Game {
         };
         // cache to store game related data
         this.state = {
-            cells:[
-                {x:0,y:0},{x:1,y:0},{x:2,y:0},
-                {x:0,y:1},{x:2,y:1},
-                {x:0,y:2},{x:2,y:2},
-                {x:0,y:4},{x:2,y:4},
-                {x:0,y:5},{x:2,y:5},
-                {x:0,y:6},{x:1,y:6},{x:2,y:6},
-            ],
+            cells: null,
             selectedCell: null,
-            ms: 500,
-            gameInterval: null,
             pause: false,
             keyPressed: {},
         };
-        //this.randomCells();
         this.resize();
+        // worker
+        this.worker = new Worker('./worker.js');
+        this.worker.onmessage = this.workerListener;
         // init Event listeners
         this.addEventListeners();
-        // start the animation motor
-        window.requestAnimationFrame(this.animate);
+    }
+
+    workerListener(e) {
+        if (!e.data.name) console.log('missing name in message', e.data);
+        switch(e.data.name) {
+            case WORKER_READY:
+                this.state.cells = e.data.cells;
+                window.requestAnimationFrame(this.animate);
+            case CELLS_UPDATED:
+                this.state.cells = e.data.cells;
+                break;
+            default:
+                console.log('unknown message type', e.data);
+                break;
+        }
+    }
+
+    updateMS(ms) {
+        this.worker.postMessage({
+            name: MS_CHANGED,
+            ms: ms,
+        })
     }
 
     /**
@@ -111,10 +130,10 @@ class Game {
         this.canvas.addEventListener('mousedown', this.mousedown);
         this.canvas.addEventListener('mouseup', this.mouseup);
         this.canvas.addEventListener('mousemove', this.mousemove);
-        this.canvas.addEventListener('touchstart', this.mousedown);
+        /*this.canvas.addEventListener('touchstart', this.mousedown);
         this.canvas.addEventListener('touchend', this.mouseup);
         this.canvas.addEventListener('touchcancel', this.mouseup);
-        this.canvas.addEventListener('touchmove', this.mousemove);
+        this.canvas.addEventListener('touchmove', this.mousemove);*/
     }
 
     /**
@@ -126,19 +145,6 @@ class Game {
         this.canvas.width = rect.width;
         this.screen.height = this.canvas.clientHeight;
         this.screen.width = this.canvas.clientWidth;
-    }
-
-    /**
-     * clear cells
-     * generate random Cells 
-     */
-    randomCells() {
-        this.state.cells = [];
-        for (let i = 0; i < 5; i++) {
-            const x = Math.floor(Math.random() * 5);
-            const y = Math.floor(Math.random() * 5);
-            this.state.cells.push({x,y})
-        }
     }
 
     /**
@@ -278,14 +284,10 @@ class Game {
     }
 
     toggleCell(cord) {
-        let index = this.state.cells.findIndex(function(cell) {
-            return cell.x == this.x && cell.y == this.y;
-        }, cord);
-        if (index === -1) {
-            this.state.cells.push(cord);
-        } else {
-            this.state.cells.splice(index, 1);
-        }
+        this.worker.postMessage({
+            name: CELL_UPDATE,
+            cord: cord,
+        })
     }
 
     /**
@@ -308,89 +310,11 @@ class Game {
     }
 
     startGameClock() {
-        this.state.gameInterval = setInterval(this.gameClock, this.state.ms)
+        this.worker.postMessage({ name: GAME_START });
     }
 
     stopGameClock() {
-        clearInterval(this.state.gameInterval);
-        this.state.gameInterval = null;
-    }
-
-    gameClock() {
-        /**
-         * if cell has 3 living neighbor, it will be born
-         * if cell has less than 2 neighbor, it will die
-         * if cell has 2 or 3 living neighbor, it will contuine to live
-         * if cell has more than 3 living neighbor, it will be die
-         */
-        // get neighbors and cells
-        const board = {};
-        for (let cell of this.state.cells) {
-            // top row
-            if (!board[cell.y - 1]) board[cell.y - 1] = {};
-            if (!board[cell.y - 1][cell.x - 1]) board[cell.y - 1][cell.x - 1] = false;
-            if (!board[cell.y - 1][cell.x]) board[cell.y - 1][cell.x] = false;
-            if (!board[cell.y - 1][cell.x + 1]) board[cell.y - 1][cell.x + 1] = false;
-            // middle row
-            if (!board[cell.y]) board[cell.y] = {};
-            if (!board[cell.y][cell.x - 1]) board[cell.y][cell.x - 1] = false;
-            board[cell.y][cell.x] = true;
-            if (!board[cell.y][cell.x + 1]) board[cell.y][cell.x + 1] = false;
-            // bottom row
-            if (!board[cell.y + 1]) board[cell.y + 1] = {};
-            if (!board[cell.y + 1][cell.x - 1]) board[cell.y + 1][cell.x - 1] = false;
-            if (!board[cell.y + 1][cell.x]) board[cell.y + 1][cell.x] = false;
-            if (!board[cell.y + 1][cell.x + 1]) board[cell.y + 1][cell.x + 1] = false;
-        }
-        const cells = [];
-        // check living condition of "cells"
-        for (let i in board) {
-            const row = board[i];
-            let ii = parseInt(i);
-            for (let j in row) {
-                const cell = row[j];
-                let jj = parseInt(j);
-                if (cell) { //if a living
-                    let numberOfNeighbor = 0;
-                    // top row
-                    if (!!board[ii - 1]) {
-                        if (!!board[ii - 1][jj - 1]) numberOfNeighbor++;
-                        if (!!board[ii - 1][jj]) numberOfNeighbor++;
-                        if (!!board[ii - 1][jj + 1]) numberOfNeighbor++;
-                    }
-                    // middle row
-                    if (board[ii][jj - 1]) numberOfNeighbor++;
-                    if (board[ii][jj + 1]) numberOfNeighbor++;
-                    // bottom row
-                    if (!!board[ii + 1]) {
-                        if (board[ii + 1][jj - 1]) numberOfNeighbor++;
-                        if (board[ii + 1][jj]) numberOfNeighbor++;
-                        if (board[ii + 1][jj + 1]) numberOfNeighbor++;
-                    }
-                    if (numberOfNeighbor > 1 && numberOfNeighbor < 4) cells.push({x: jj, y: ii});
-                } else {
-                    let numberOfNeighbor = 0;
-                    // top row
-                    if (!!board[ii - 1]) {
-                        if (board[ii - 1][jj - 1]) numberOfNeighbor++;
-                        if (board[ii - 1][jj]) numberOfNeighbor++;
-                        if (board[ii - 1][jj + 1]) numberOfNeighbor++;
-                    }
-                    // middle row
-                    if (board[ii][jj - 1]) numberOfNeighbor++;
-                    if (board[ii][jj + 1]) numberOfNeighbor++;
-                    // bottom row
-                    if (!!board[ii + 1]) {
-                        if (board[ii + 1][jj - 1]) numberOfNeighbor++;
-                        if (board[ii + 1][jj]) numberOfNeighbor++;
-                        if (board[ii + 1][jj + 1]) numberOfNeighbor++;
-                    }
-                    //console.log(i, j, numberOfNeighbor , 'd', numberOfNeighbor === 3);
-                    if (numberOfNeighbor === 3) cells.push({x: jj, y: ii});
-                }
-            }
-        }
-        this.state.cells = cells;
+        this.worker.postMessage({ name: GAME_END });
     }
 
     convertBetweenGameCordAndGS(cord, to) {
@@ -410,11 +334,7 @@ class Game {
     }
 
     printDebug() {
-        const screenStartInGS = this.convertBetweenGSAndScreen({x:0,y:0}, 'GS');
-        console.log(screenStartInGS)
-        console.log((screenStartInGS.x % (this.screen.zoom + BORDER_WIDTH)))
-        let cursor = (screenStartInGS.x % (this.screen.zoom + BORDER_WIDTH)) + (this.screen.zoom + BORDER_WIDTH);
-        console.log(cursor)
+        //debug
     }
 
     /**

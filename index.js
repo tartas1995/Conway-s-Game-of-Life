@@ -26,6 +26,7 @@ class Game {
         this.resize = this.resize.bind(this);
         this.calculateIconRegister = this.calculateIconRegister.bind(this);
         this.zoom = this.zoom.bind(this);
+        this.toggleHUD = this.toggleHUD.bind(this);
         // camera
         this.cameraOn = this.cameraOn.bind(this);
         this.cameraOff = this.cameraOff.bind(this);
@@ -97,6 +98,7 @@ class Game {
             selectedCell: null,
             pause: true,
             freezed: false,
+            hud: true,
             keyPressed: {},
         };
         this.resize();
@@ -121,6 +123,12 @@ class Game {
                 break;
         }
     }
+
+    /*displayDialog() {
+        let ms  = prompt("update MS:", 200);
+        ms = parseInt(ms);
+        this.updateMS(ms);
+    }*/
 
     updateMS(ms) {
         this.worker.postMessage({
@@ -162,6 +170,10 @@ class Game {
         this.screen.hover.x = null;
         this.screen.hover.y = null;
         return false;
+    }
+
+    toggleHUD() {
+        this.state.hud = !this.state.hud;
     }
 
     freeze() {
@@ -296,6 +308,9 @@ class Game {
             case 'f':
                 this.freeze();
                 break;
+            case 'h':
+                this.toggleHUD();
+                break;
             case 'p':
             case ' ': //space
                 this.pause();
@@ -316,7 +331,7 @@ class Game {
 
     mousedown(e) {
         if (!this.state.freezed) {
-            if (this.checkIconRegisterForEvents(e.offsetX, e.offsetY)) {
+            if (this.state.hud && this.checkIconRegisterForEvents(e.offsetX, e.offsetY)) {
                 return;
             }
             this.cameraOn(e);
@@ -333,7 +348,9 @@ class Game {
 
     mousemove(e) {
         this.cameraMove(e);
-        this.checkIconRegisterForHover(e.offsetX, e.offsetY);
+        if (this.state.hud) {
+            this.checkIconRegisterForHover(e.offsetX, e.offsetY);
+        }
     }
 
     touchstart(e) {
@@ -489,62 +506,65 @@ class Game {
                 this.screen.height / 2 - textPixelSize / 2
             );
         }
-        // playButton
-        if (this.state.pause) {
-            const x = this.iconRegister.playButton.x;
-            const y = this.iconRegister.playButton.y;
-            const size = this.iconRegister.playButton.size;
-            this.ctx.fillStyle = COLOR_WHITE;
-            this.ctx.strokeStyle = COLOR_BLUE;
-            this.ctx.lineWidth = size / 20;
-            this.ctx.beginPath();
-            this.ctx.moveTo(x, y);
-            this.ctx.lineTo(x, y + size);
-            this.ctx.lineTo(x + size, y + (size / 2));
-            this.ctx.lineTo(x, y);
-            this.ctx.fill();
-            this.ctx.stroke();
-        } else {
-            const x = this.iconRegister.playButton.x;
-            const y = this.iconRegister.playButton.y;
-            const size = this.iconRegister.playButton.size;
-            const width = size / 3;
-            this.ctx.fillStyle = COLOR_WHITE;
-            this.ctx.strokeStyle = COLOR_BLUE;
-            this.ctx.lineWidth = size / 20;
-            this.ctx.beginPath();
-            // first element
-            this.ctx.moveTo(x, y);
-            this.ctx.lineTo(x, y + size);
-            this.ctx.lineTo(x + width, y + size);
-            this.ctx.lineTo(x + width, y);
-            this.ctx.lineTo(x, y);
-            // second element
-            this.ctx.moveTo(x + (width * 2), y);
-            this.ctx.lineTo(x + (width * 2), y + size);
-            this.ctx.lineTo(x + (width * 3), y + size);
-            this.ctx.lineTo(x + (width * 3), y);
-            this.ctx.lineTo(x + (width * 2), y);
-            this.ctx.fill();
-            this.ctx.stroke();
-        }
-        // hover text for icon
-        if (this.screen.hover.x !== null) {
-            const textPixelSize = 20;
-            this.ctx.font = `bold ${textPixelSize}px Arial`;
-            this.ctx.lineWidth = BORDER_WIDTH;
-            this.ctx.fillStyle = COLOR_WHITE;
-            this.ctx.strokeStyle = COLOR_BLACK;
-            this.ctx.fillText(
-                this.screen.hover.text, 
-                this.screen.hover.x, 
-                this.screen.hover.y
-            ); 
-            this.ctx.strokeText(
-                this.screen.hover.text, 
-                this.screen.hover.x, 
-                this.screen.hover.y
-            );
+        // draw HUD
+        if (this.state.hud) {
+            // playButton
+            if (this.state.pause) {
+                const x = this.iconRegister.playButton.x;
+                const y = this.iconRegister.playButton.y;
+                const size = this.iconRegister.playButton.size;
+                this.ctx.fillStyle = COLOR_WHITE;
+                this.ctx.strokeStyle = COLOR_BLUE;
+                this.ctx.lineWidth = size / 20;
+                this.ctx.beginPath();
+                this.ctx.moveTo(x, y);
+                this.ctx.lineTo(x, y + size);
+                this.ctx.lineTo(x + size, y + (size / 2));
+                this.ctx.lineTo(x, y);
+                this.ctx.fill();
+                this.ctx.stroke();
+            } else {
+                const x = this.iconRegister.playButton.x;
+                const y = this.iconRegister.playButton.y;
+                const size = this.iconRegister.playButton.size;
+                const width = size / 3;
+                this.ctx.fillStyle = COLOR_WHITE;
+                this.ctx.strokeStyle = COLOR_BLUE;
+                this.ctx.lineWidth = size / 20;
+                this.ctx.beginPath();
+                // first element
+                this.ctx.moveTo(x, y);
+                this.ctx.lineTo(x, y + size);
+                this.ctx.lineTo(x + width, y + size);
+                this.ctx.lineTo(x + width, y);
+                this.ctx.lineTo(x, y);
+                // second element
+                this.ctx.moveTo(x + (width * 2), y);
+                this.ctx.lineTo(x + (width * 2), y + size);
+                this.ctx.lineTo(x + (width * 3), y + size);
+                this.ctx.lineTo(x + (width * 3), y);
+                this.ctx.lineTo(x + (width * 2), y);
+                this.ctx.fill();
+                this.ctx.stroke();
+            }
+            // hover text for icon
+            if (this.screen.hover.x !== null) {
+                const textPixelSize = 20;
+                this.ctx.font = `bold ${textPixelSize}px Arial`;
+                this.ctx.lineWidth = BORDER_WIDTH;
+                this.ctx.fillStyle = COLOR_WHITE;
+                this.ctx.strokeStyle = COLOR_BLACK;
+                this.ctx.fillText(
+                    this.screen.hover.text, 
+                    this.screen.hover.x, 
+                    this.screen.hover.y
+                ); 
+                this.ctx.strokeText(
+                    this.screen.hover.text, 
+                    this.screen.hover.x, 
+                    this.screen.hover.y
+                );
+            }
         }
     }
 }
